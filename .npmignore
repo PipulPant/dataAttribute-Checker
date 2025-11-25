@@ -1,12 +1,47 @@
+# Source files
 src/
-*.test.ts
-*.spec.ts
-__tests__/
+*.ts
+!dist/**/*.d.ts
+
+# Old/backup files
+**/*-old.ts
+**/*-backup.ts
+**/*-commander.ts
+**/*-optimized.ts
+
+# Test files
+**/*.test.ts
+**/__tests__/
+**/*.spec.ts
+examples/
+
+# Development files
 tsconfig.json
 jest.config.js
-.gitignore
-*.example.js
-*.example.ts
-node_modules/
-coverage/
+*.config.js
+*.config.ts
+!dist/**/*.js
 
+# Documentation (keep README.md)
+ENHANCEMENTS.md
+PUBLISHING.md
+QUICK_START.md
+NPM_PUBLISH_GUIDE.md
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local

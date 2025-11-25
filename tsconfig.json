@@ -16,6 +16,14 @@
     "moduleResolution": "node"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/*.test.ts",
+    "**/*-old.ts",
+    "**/*-backup.ts",
+    "**/*-commander.ts",
+    "**/*-optimized.ts"
+  ]
 }
 

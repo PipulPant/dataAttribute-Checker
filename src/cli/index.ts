@@ -70,6 +70,10 @@ async function main() {
   let browser: Browser | null = null;
   let progressBar: ProgressBar | null = null;
   let spinner: Spinner | null = null;
+  
+  // Store progressBar reference to avoid type narrowing issues
+  const getProgressBar = (): ProgressBar | null => progressBar;
+  const setProgressBar = (pb: ProgressBar | null): void => { progressBar = pb; };
 
   try {
     // Show spinner while launching browser
@@ -101,11 +105,13 @@ async function main() {
     // Set up progress callback
     if (!options.noProgress) {
       auditOptions.onProgress = (progress) => {
-        if (!progressBar && progress.total > 0) {
-          progressBar = new ProgressBar(progress.total);
-        }
-        if (progressBar) {
-          progressBar.update(progress.scanned);
+        const currentPb = getProgressBar();
+        if (!currentPb && progress.total > 0) {
+          const newPb = new ProgressBar(progress.total);
+          setProgressBar(newPb);
+          newPb.update(progress.scanned);
+        } else if (currentPb) {
+          currentPb.update(progress.scanned);
         }
       };
     }
@@ -113,8 +119,10 @@ async function main() {
     // Run audit
     const result = await auditTestAttributes(page, auditOptions);
 
-    if (progressBar) {
-      progressBar.complete();
+    // Complete progress bar if it exists
+    const finalPb = getProgressBar();
+    if (finalPb) {
+      finalPb.complete();
     }
 
     // Save JSON report if output path is provided
@@ -148,7 +156,10 @@ async function main() {
     process.exit(result.missingAttributeCount > 0 ? 1 : 0);
   } catch (error: any) {
     if (spinner) spinner.stop();
-    if (progressBar) progressBar.complete();
+    const errorPb = getProgressBar();
+    if (errorPb) {
+      errorPb.complete();
+    }
     
     // Check if it's a threshold error
     if (error.message && error.message.includes('threshold')) {

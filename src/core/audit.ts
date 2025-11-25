@@ -1,5 +1,8 @@
 import { Page } from 'playwright';
-import { AuditOptions, AuditResult, MissingAttributeElement } from './types';
+import type { AuditOptions, AuditResult, MissingAttributeElement } from './types';
+
+// Re-export types for convenience
+export type { AuditOptions, AuditResult, MissingAttributeElement } from './types';
 
 /**
  * Default selectors to scan for interactive elements
@@ -44,17 +47,17 @@ function colorize(text: string, color: keyof typeof colors): string {
  */
 async function generateXPath(element: any): Promise<string | undefined> {
   try {
-    return await element.evaluate((el: Element) => {
-      const getXPath = (node: Node | null): string => {
-        if (!node || node.nodeType !== Node.ELEMENT_NODE) {
+    return await element.evaluate((el: any) => {
+      const getXPath = (node: any): string => {
+        if (!node || node.nodeType !== 1) { // ELEMENT_NODE = 1
           return '';
         }
-        const element = node as Element;
+        const element = node;
         if (element.id) {
           return `//*[@id="${element.id}"]`;
         }
         const siblings = Array.from(element.parentNode?.children || [])
-          .filter((sibling: Element) => sibling.tagName === element.tagName);
+          .filter((sibling: any) => sibling.tagName === element.tagName);
         if (siblings.length === 1) {
           return `${getXPath(element.parentNode)}/${element.tagName.toLowerCase()}`;
         }
@@ -71,14 +74,14 @@ async function generateXPath(element: any): Promise<string | undefined> {
 /**
  * Batch fetch all element properties in a single evaluate call (#3 - Caching Element Properties)
  */
-async function getElementProperties(element: any): Promise<{
+async function getElementProperties(element: any, excludeSelectors: string[]): Promise<{
   tagName: string;
   textSnippet: string;
   role: string | null;
   selector: string;
   shouldExclude: boolean;
 }> {
-  return await element.evaluate((el: Element, excludeSelectors: string[]) => {
+  return await element.evaluate((el: any, excludeSelectors: string[]) => {
     const tagName = el.tagName.toLowerCase();
     const textContent = (el.textContent || '').trim();
     const textSnippet = textContent.substring(0, 100);
@@ -89,7 +92,7 @@ async function getElementProperties(element: any): Promise<{
     if (el.id) {
       selector = `#${el.id}`;
     } else if (el.className && typeof el.className === 'string') {
-      const classes = el.className.split(' ').filter(c => c).join('.');
+      const classes = el.className.split(' ').filter((c: string) => c).join('.');
       if (classes) {
         selector = `${tagName}.${classes}`;
       }
@@ -104,7 +107,7 @@ async function getElementProperties(element: any): Promise<{
           break;
         }
         // Check ancestors
-        let current: Element | null = el.parentElement;
+        let current: any = el.parentElement;
         while (current) {
           try {
             if (current.matches(excludeSelector)) {
@@ -179,7 +182,7 @@ export async function auditTestAttributes(
   const elementsWithProperties = await Promise.all(
     allElementHandles.map(async ({ element, selector: originalSelector }, index) => {
       try {
-        const props = await element.evaluate((el: Element, excludeSelectors: string[]) => {
+        const props = await element.evaluate((el: any, excludeSelectors: string[]) => {
           const tagName = el.tagName.toLowerCase();
           const textContent = (el.textContent || '').trim();
           const textSnippet = textContent.substring(0, 100);
@@ -190,7 +193,7 @@ export async function auditTestAttributes(
           if (el.id) {
             selector = `#${el.id}`;
           } else if (el.className && typeof el.className === 'string') {
-            const classes = el.className.split(' ').filter(c => c).join('.');
+            const classes = el.className.split(' ').filter((c: string) => c).join('.');
             if (classes) {
               selector = `${tagName}.${classes}`;
             }
@@ -205,7 +208,7 @@ export async function auditTestAttributes(
                 break;
               }
               // Check ancestors
-              let current: Element | null = el.parentElement;
+              let current: any = el.parentElement;
               while (current) {
                 try {
                   if (current.matches(excludeSelector)) {
@@ -266,7 +269,7 @@ export async function auditTestAttributes(
     validElements.map(async (item) => {
       try {
         const hasAttribute = await item.element.evaluate(
-          (el: Element, attr: string) => el.hasAttribute(attr),
+          (el: any, attr: string) => el.hasAttribute(attr),
           attributeName
         );
         return { ...item, hasAttribute };
@@ -307,7 +310,7 @@ export async function auditTestAttributes(
       }
 
       // Generate suggested value
-      const suggestedValue = await item.element.evaluate((el: Element) => {
+      const suggestedValue = await item.element.evaluate((el: any) => {
         const text = (el.textContent || '').trim().toLowerCase();
         const id = el.id;
         const className = el.className;
