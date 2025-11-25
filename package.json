@@ -1,6 +1,6 @@
 {
   "name": "playwright-attr-audit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A Playwright plugin to audit missing test attributes on web pages",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
