@@ -520,9 +520,64 @@ The HTML report includes:
 - 🏷️ **Grouped by tag** - Elements organized by tag type for easier navigation
 - 💡 **Visual indicators** - Color-coded coverage bars and status badges
 
-### Configuration File
+### Configuration Priority (Three-Tier System)
 
-Create an `attr-audit.config.js` file in your project root:
+The package uses a smart three-tier configuration system that works with any Playwright framework:
+
+#### 🥇 Priority 1: Playwright Config File (Recommended)
+
+Add configuration to your `playwright.config.js` or `playwright.config.ts`:
+
+```javascript
+// playwright.config.js
+module.exports = {
+  // ... your existing Playwright config ...
+  
+  playwrightAttrAudit: {
+    attributeName: 'data-test-id', // Your custom attribute
+  },
+  
+  // OR in the use block:
+  use: {
+    playwrightAttrAudit: {
+      attributeName: 'data-test-id',
+    },
+  },
+};
+```
+
+**Benefits:**
+- ✅ Works with any Playwright framework
+- ✅ Centralized configuration
+- ✅ No code changes needed in tests
+
+#### 🥈 Priority 2: Test Options
+
+If not set in Playwright config, pass it in your test:
+
+```javascript
+await auditCurrentPage(page, 'My-Report', {
+  attributeName: 'data-test-id', // Custom attribute
+  captureScreenshots: true,
+  includeElementsWithAttribute: true,
+});
+```
+
+#### 🥉 Priority 3: Default Regex Pattern
+
+If neither config nor options specify an attribute, the package defaults to matching **any attribute starting with `data-`** using regex (`/^data-/i`).
+
+This automatically finds:
+- `data-test-id`
+- `data-testid`
+- `data-testID`
+- `data-qa`
+- `data-cy`
+- Any other `data-*` attribute
+
+### Legacy Configuration File (Still Supported)
+
+You can also create an `attr-audit.config.js` file in your project root:
 
 ```javascript
 module.exports = {

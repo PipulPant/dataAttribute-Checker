@@ -1,5 +1,6 @@
 import { Page } from 'playwright';
 import type { AuditOptions, AuditResult, MissingAttributeElement } from './types';
+import { getAttributeName } from './config-reader';
 
 // Re-export types for convenience
 export type { AuditOptions, AuditResult, MissingAttributeElement } from './types';
@@ -142,8 +143,13 @@ export async function auditTestAttributes(
   page: Page,
   options: AuditOptions = {}
 ): Promise<AuditResult> {
+  // Get attribute name with priority: Playwright config > options > default regex
+  const attributeNameOrPattern = getAttributeName(options);
+  const attributeName = typeof attributeNameOrPattern === 'string' 
+    ? attributeNameOrPattern 
+    : DEFAULT_ATTRIBUTE_NAME; // Fallback for regex pattern display
+  
   const {
-    attributeName = DEFAULT_ATTRIBUTE_NAME,
     includeSelectors = DEFAULT_INCLUDE_SELECTORS,
     excludeSelectors = [],
     minTextLength = 0,
@@ -267,13 +273,29 @@ export async function auditTestAttributes(
   }>;
 
   // Check attributes in parallel (#1 - Parallel Processing)
+  // Support both string attribute name and regex pattern
   const attributeChecks = await Promise.all(
     validElements.map(async (item) => {
       try {
-        const hasAttribute = await item.element.evaluate(
-          (el: any, attr: string) => el.hasAttribute(attr),
-          attributeName
-        );
+        let hasAttribute = false;
+        
+        if (typeof attributeNameOrPattern === 'string') {
+          // String attribute name - check exact match
+          hasAttribute = await item.element.evaluate(
+            (el: any, attr: string) => el.hasAttribute(attr),
+            attributeNameOrPattern
+          );
+        } else {
+          // Regex pattern - check all attributes and match pattern
+          hasAttribute = await item.element.evaluate(
+            (el: any, pattern: RegExp) => {
+              const attrs = el.getAttributeNames();
+              return attrs.some((attr: string) => pattern.test(attr));
+            },
+            attributeNameOrPattern
+          );
+        }
+        
         return { ...item, hasAttribute };
       } catch (error) {
         if (logToConsole) {
@@ -377,27 +399,68 @@ export async function auditTestAttributes(
         // Bounding box not available
       }
 
-      // Generate suggested value
+      // Generate suggested value in data-test-id format (kebab-case with hyphens)
       const suggestedValue = await item.element.evaluate((el: any) => {
         const text = (el.textContent || '').trim().toLowerCase();
         const id = el.id;
         const className = el.className;
+        const name = el.name;
+        const placeholder = el.placeholder;
 
+        // Priority 1: Use ID if available (convert to kebab-case)
         if (id) {
-          return id.replace(/[^a-z0-9-]/gi, '-').toLowerCase();
-        }
-        if (text && text.length > 0 && text.length < 50) {
-          return text
-            .replace(/[^a-z0-9\s-]/gi, '')
-            .replace(/\s+/g, '-')
+          return id
+            .replace(/([A-Z])/g, '-$1') // Add hyphen before capital letters
+            .replace(/[^a-z0-9-]/gi, '-') // Replace non-alphanumeric with hyphen
+            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
             .toLowerCase();
         }
+
+        // Priority 2: Use name attribute if available
+        if (name) {
+          return name
+            .replace(/([A-Z])/g, '-$1')
+            .replace(/[^a-z0-9-]/gi, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            .toLowerCase();
+        }
+
+        // Priority 3: Use text content (convert to kebab-case)
+        if (text && text.length > 0 && text.length < 50) {
+          return text
+            .replace(/[^a-z0-9\s-]/gi, '') // Remove special chars
+            .replace(/\s+/g, '-') // Replace spaces with hyphens
+            .replace(/-+/g, '-') // Replace multiple hyphens with single
+            .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+            .toLowerCase();
+        }
+
+        // Priority 4: Use placeholder if available
+        if (placeholder) {
+          return placeholder
+            .replace(/[^a-z0-9\s-]/gi, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            .toLowerCase();
+        }
+
+        // Priority 5: Use className (first meaningful class)
         if (className && typeof className === 'string') {
-          const classes = className.split(' ').filter(c => c && !c.includes('css-'));
+          const classes = className.split(' ').filter(c => c && !c.includes('css-') && !c.startsWith('Mui'));
           if (classes.length > 0) {
-            return classes[0].replace(/[^a-z0-9-]/gi, '-').toLowerCase();
+            return classes[0]
+              .replace(/([A-Z])/g, '-$1')
+              .replace(/[^a-z0-9-]/gi, '-')
+              .replace(/-+/g, '-')
+              .replace(/^-|-$/g, '')
+              .toLowerCase();
           }
         }
+
+        // Fallback: Use tag name with random suffix
         return `${el.tagName.toLowerCase()}-${Math.random().toString(36).substring(2, 8)}`;
       });
 

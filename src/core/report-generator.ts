@@ -18,6 +18,11 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
   const coveragePercentage = result.totalElementsScanned > 0
     ? Math.round(((result.totalElementsScanned - result.missingAttributeCount) / result.totalElementsScanned) * 100)
     : 100;
+  
+  // Convert attributeName to display string
+  const attributeNameDisplay = typeof result.attributeName === 'string' 
+    ? result.attributeName 
+    : result.attributeName.toString();
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -463,7 +468,7 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
       <div class="meta">
         <div>Page: <strong>${escapeHtml(result.pageUrl)}</strong></div>
         <div>Audited: <strong>${new Date(result.timestamp).toLocaleString()}</strong></div>
-        <div>Attribute: <strong>${escapeHtml(result.attributeName)}</strong></div>
+        <div>Attribute: <strong>${escapeHtml(attributeNameDisplay)}</strong></div>
       </div>
     </header>
     
@@ -485,20 +490,20 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
       </div>
     </div>
     
-    ${result.elementsWithAttribute && result.elementsWithAttribute.length > 0 ? generateFilterControls() : ''}
+    ${(result.elementsWithAttribute && result.elementsWithAttribute.length > 0) || result.missingAttributeCount > 0 ? generateFilterControls(result) : ''}
     
     <div class="content">
       ${result.missingAttributeCount === 0 && (!result.elementsWithAttribute || result.elementsWithAttribute.length === 0) 
         ? generateEmptyState() 
         : (result.elementsWithAttribute && result.elementsWithAttribute.length > 0 
-          ? generateAllElementsSection(groupedByTag, result)
-          : generateMissingElementsSection(groupedByTag, result))}
+          ? generateAllElementsSection(groupedByTag, result, attributeNameDisplay)
+          : generateMissingElementsSection(groupedByTag, result, attributeNameDisplay))}
       
       <div class="instructions">
         <h3>📖 How to View This Report</h3>
         <ol>
           <li><strong>Open the HTML file:</strong> Double-click the report file (<code>${path.basename(outputPath || 'report.html')}</code>) to open it in your default web browser.</li>
-          <li><strong>View missing elements:</strong> Scroll through the report to see all elements missing the <code>${escapeHtml(result.attributeName)}</code> attribute.</li>
+          <li><strong>View missing elements:</strong> Scroll through the report to see all elements missing the <code>${escapeHtml(attributeNameDisplay)}</code> attribute.</li>
           <li><strong>Click URLs:</strong> Click on any page URL to navigate directly to that page in your browser.</li>
           <li><strong>Use suggested values:</strong> Each element includes a suggested test attribute value you can use.</li>
           <li><strong>Filter by tag:</strong> Elements are grouped by tag type for easier navigation.</li>
@@ -509,6 +514,53 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
       </div>
     </div>
   </div>
+  <script>
+    // Filter toggle functionality
+    (function() {
+      const toggleMissing = document.getElementById('toggleMissing');
+      const toggleHasAttribute = document.getElementById('toggleHasAttribute');
+      
+      if (!toggleMissing) return;
+      
+      function updateVisibility() {
+        const showMissing = toggleMissing ? toggleMissing.checked : true;
+        const showHasAttribute = toggleHasAttribute ? toggleHasAttribute.checked : false;
+        
+        // Show/hide missing elements
+        const missingElements = document.querySelectorAll('[data-type="missing"]');
+        missingElements.forEach(el => {
+          (el as HTMLElement).style.display = showMissing ? '' : 'none';
+        });
+        
+        // Show/hide elements with attributes
+        const hasElements = document.querySelectorAll('[data-type="has-attribute"]');
+        hasElements.forEach(el => {
+          (el as HTMLElement).style.display = showHasAttribute ? '' : 'none';
+        });
+        
+        // Show/hide section headers
+        const missingSection = document.getElementById('missing-section');
+        const hasSection = document.getElementById('has-attribute-section');
+        
+        if (missingSection) {
+          (missingSection as HTMLElement).style.display = showMissing ? '' : 'none';
+        }
+        if (hasSection) {
+          (hasSection as HTMLElement).style.display = showHasAttribute ? '' : 'none';
+        }
+      }
+      
+      if (toggleMissing) {
+        toggleMissing.addEventListener('change', updateVisibility);
+      }
+      if (toggleHasAttribute) {
+        toggleHasAttribute.addEventListener('change', updateVisibility);
+      }
+      
+      // Initial visibility
+      updateVisibility();
+    })();
+  </script>
 </body>
 </html>`;
 }
@@ -523,7 +575,8 @@ function generateEmptyState(): string {
   `;
 }
 
-function generateFilterControls(): string {
+function generateFilterControls(result: AuditResult): string {
+  const hasElementsWithAttribute = result.elementsWithAttribute && result.elementsWithAttribute.length > 0;
   return `
     <div class="filter-controls">
       <div class="filter-toggle">
@@ -533,23 +586,36 @@ function generateFilterControls(): string {
           <span class="toggle-slider"></span>
         </label>
         <span class="filter-label">Missing Attributes</span>
-        <span class="filter-badge missing" id="missingCount">0</span>
+        <span class="filter-badge missing" id="missingCount">${result.missingAttributeCount}</span>
       </div>
+      ${hasElementsWithAttribute ? `
       <div class="filter-toggle">
         <label class="toggle-switch">
           <input type="checkbox" id="toggleHasAttribute" checked>
           <span class="toggle-slider"></span>
         </label>
         <span class="filter-label">Has Attributes</span>
-        <span class="filter-badge has-attr" id="hasAttributeCount">0</span>
+        <span class="filter-badge has-attr" id="hasAttributeCount">${result.hasAttributeCount || 0}</span>
       </div>
+      ` : `
+      <div class="filter-toggle" style="opacity: 0.5;">
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleHasAttribute" disabled>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="filter-label">Has Attributes</span>
+        <span class="filter-badge has-attr" id="hasAttributeCount">0</span>
+        <span style="font-size: 11px; color: #6b7280; margin-left: 8px;">(Enable includeElementsWithAttribute: true)</span>
+      </div>
+      `}
     </div>
   `;
 }
 
 function generateAllElementsSection(
   groupedByTag: Map<string, MissingAttributeElement[]>,
-  result: AuditResult
+  result: AuditResult,
+  attributeNameDisplay: string
 ): string {
   const groupedWithAttribute = result.elementsWithAttribute 
     ? groupElementsByTag(result.elementsWithAttribute as any[])
@@ -561,7 +627,7 @@ function generateAllElementsSection(
   if (result.missingAttributeCount > 0) {
     html += '<div class="group" id="missing-section">';
     html += '<div class="group-header" style="background: #fee2e2; color: #991b1b;">';
-    html += `❌ Missing ${escapeHtml(result.attributeName)} (${result.missingAttributeCount} ${result.missingAttributeCount === 1 ? 'element' : 'elements'})`;
+    html += `❌ Missing ${escapeHtml(attributeNameDisplay)} (${result.missingAttributeCount} ${result.missingAttributeCount === 1 ? 'element' : 'elements'})`;
     html += '</div><div class="element-list">';
     
     for (const [tagName, elements] of groupedByTag.entries()) {
@@ -570,7 +636,7 @@ function generateAllElementsSection(
       html += '<div class="element-list">';
       
       for (const element of elements) {
-        html += generateElementCard(element, result.attributeName, 'missing');
+        html += generateElementCard(element, attributeNameDisplay, 'missing');
       }
       
       html += '</div></div>';
@@ -583,7 +649,7 @@ function generateAllElementsSection(
   if (result.elementsWithAttribute && result.elementsWithAttribute.length > 0) {
     html += '<div class="group" id="has-attribute-section" style="margin-top: 30px;">';
     html += '<div class="group-header" style="background: #d1fae5; color: #065f46;">';
-    html += `✅ Has ${escapeHtml(result.attributeName)} (${result.hasAttributeCount || 0} ${(result.hasAttributeCount || 0) === 1 ? 'element' : 'elements'})`;
+    html += `✅ Has ${escapeHtml(attributeNameDisplay)} (${result.hasAttributeCount || 0} ${(result.hasAttributeCount || 0) === 1 ? 'element' : 'elements'})`;
     html += '</div><div class="element-list">';
     
     for (const [tagName, elements] of groupedWithAttribute.entries()) {
@@ -592,7 +658,7 @@ function generateAllElementsSection(
       html += '<div class="element-list">';
       
       for (const element of elements) {
-        html += generateElementCardWithAttribute(element as HasAttributeElement, result.attributeName);
+        html += generateElementCardWithAttribute(element as HasAttributeElement, attributeNameDisplay);
       }
       
       html += '</div></div>';
@@ -607,7 +673,8 @@ function generateAllElementsSection(
 
 function generateMissingElementsSection(
   groupedByTag: Map<string, MissingAttributeElement[]>,
-  result: AuditResult
+  result: AuditResult,
+  attributeNameDisplay: string
 ): string {
   let html = '<div class="section"><h2>Missing Test Attributes</h2>';
   
@@ -621,7 +688,7 @@ function generateMissingElementsSection(
     `;
     
     for (const element of elements) {
-      html += generateElementCard(element, result.attributeName);
+      html += generateElementCard(element, attributeNameDisplay);
     }
     
     html += `

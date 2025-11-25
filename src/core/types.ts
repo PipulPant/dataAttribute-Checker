@@ -191,9 +191,10 @@ export interface HasAttributeElement {
  */
 export interface AuditResult {
   /**
-   * The attribute name that was audited
+   * The attribute name or pattern that was audited
+   * Can be a string (exact attribute name) or RegExp pattern (e.g., /^data-/i)
    */
-  attributeName: string;
+  attributeName: string | RegExp;
 
   /**
    * Total number of elements scanned
