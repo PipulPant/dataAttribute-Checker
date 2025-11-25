@@ -6,9 +6,10 @@ A Playwright plugin and CLI tool to audit web pages for missing test attributes 
 
 - 🔍 Scans DOM for interactive elements (buttons, links, inputs, etc.)
 - 📊 Generates detailed reports of missing test attributes
-- 🎯 Configurable attribute names (default: `data-testID`)
+- 🎯 **Fully configurable attribute names** - Use `data-testid`, `data-qa`, `data-cy`, or any custom attribute
+- 📸 **Element screenshots** - Visual screenshots of missing elements in HTML reports (optional)
 - 🎨 Works as a Playwright helper or standalone CLI tool
-- ⚙️ Supports configuration files
+- ⚙️ Supports configuration files for easy customization
 - 📝 TypeScript-first with full type definitions
 - 🔄 **Perfect for navigation workflows** - Audit pages as you navigate through your app
 
@@ -213,7 +214,8 @@ test('page has test attributes', async ({ page, auditTestAttributes }) => {
   
   // Use the fixture - no need to pass page parameter
   const result = await auditTestAttributes({
-    attributeName: 'data-testID',
+    attributeName: 'data-testID', // 👈 Customize for your organization
+    captureScreenshots: true, // 👈 Enable screenshots in reports
   });
 
   expect(result.missingAttributeCount).toBe(0);
@@ -524,12 +526,27 @@ Create an `attr-audit.config.js` file in your project root:
 
 ```javascript
 module.exports = {
-  attributeName: 'data-testid',
+  // ⚙️ CUSTOMIZE ATTRIBUTE NAME FOR YOUR ORGANIZATION
+  // Different organizations use different naming conventions:
+  // - "data-testid" (common)
+  // - "data-testID" (default)
+  // - "data-test-id"
+  // - "data-qa"
+  // - "data-cy" (Cypress convention)
+  // - "testid"
+  // - Custom: "data-my-org-test"
+  attributeName: 'data-testid', // 👈 Change this to your organization's standard
+  
   includeSelectors: ['button', 'a', '[role=button]', 'input'],
   excludeSelectors: ['.ignore-for-test', '[data-skip-audit]'],
   minTextLength: 1,
+  
+  // 📸 Enable screenshots in HTML reports (optional)
+  captureScreenshots: false, // Set to true to include element screenshots
 };
 ```
+
+**See `attr-audit.config.example.js` for a complete configuration example with all options.**
 
 Or with TypeScript (`attr-audit.config.ts`):
 

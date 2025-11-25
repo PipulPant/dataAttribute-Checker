@@ -1,4 +1,4 @@
-import { AuditResult, MissingAttributeElement } from './types';
+import { AuditResult, MissingAttributeElement, HasAttributeElement } from './types';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -176,6 +176,154 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
       border-bottom: none;
     }
     
+    .element-screenshot {
+      margin-top: 15px;
+      border: 2px solid #e5e7eb;
+      border-radius: 6px;
+      overflow: hidden;
+      max-width: 500px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      background: #f9fafb;
+    }
+    
+    .element-screenshot img {
+      width: 100%;
+      height: auto;
+      display: block;
+      max-height: 300px;
+      object-fit: contain;
+    }
+    
+    .element-screenshot-label {
+      background: #667eea;
+      color: white;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .screenshot-placeholder {
+      padding: 40px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 14px;
+      background: #f3f4f6;
+      border: 2px dashed #d1d5db;
+      border-radius: 6px;
+    }
+    
+    .filter-controls {
+      background: #f9fafb;
+      padding: 20px 30px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    
+    .filter-toggle {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #cbd5e1;
+      transition: 0.3s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: #667eea;
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(26px);
+    }
+    
+    .filter-label {
+      font-weight: 500;
+      color: #374151;
+      font-size: 14px;
+    }
+    
+    .filter-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-left: 10px;
+    }
+    
+    .filter-badge.missing {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    
+    .filter-badge.has-attr {
+      background: #d1fae5;
+      color: #065f46;
+    }
+    
+    .element-item.has-attribute {
+      border-left: 4px solid #10b981;
+    }
+    
+    .element-item.missing-attribute {
+      border-left: 4px solid #ef4444;
+    }
+    
+    .attribute-value {
+      background: #d1fae5;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      color: #065f46;
+      display: inline-block;
+      margin-top: 5px;
+      font-weight: 600;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
     .element-header {
       display: flex;
       align-items: center;
@@ -337,8 +485,14 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
       </div>
     </div>
     
+    ${result.elementsWithAttribute && result.elementsWithAttribute.length > 0 ? generateFilterControls() : ''}
+    
     <div class="content">
-      ${result.missingAttributeCount === 0 ? generateEmptyState() : generateMissingElementsSection(groupedByTag, result)}
+      ${result.missingAttributeCount === 0 && (!result.elementsWithAttribute || result.elementsWithAttribute.length === 0) 
+        ? generateEmptyState() 
+        : (result.elementsWithAttribute && result.elementsWithAttribute.length > 0 
+          ? generateAllElementsSection(groupedByTag, result)
+          : generateMissingElementsSection(groupedByTag, result))}
       
       <div class="instructions">
         <h3>📖 How to View This Report</h3>
@@ -367,6 +521,88 @@ function generateEmptyState(): string {
       <p>All scanned elements have the required test attribute. Great job! 🎉</p>
     </div>
   `;
+}
+
+function generateFilterControls(): string {
+  return `
+    <div class="filter-controls">
+      <div class="filter-toggle">
+        <span class="filter-label">Show:</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleMissing" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="filter-label">Missing Attributes</span>
+        <span class="filter-badge missing" id="missingCount">0</span>
+      </div>
+      <div class="filter-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" id="toggleHasAttribute" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="filter-label">Has Attributes</span>
+        <span class="filter-badge has-attr" id="hasAttributeCount">0</span>
+      </div>
+    </div>
+  `;
+}
+
+function generateAllElementsSection(
+  groupedByTag: Map<string, MissingAttributeElement[]>,
+  result: AuditResult
+): string {
+  const groupedWithAttribute = result.elementsWithAttribute 
+    ? groupElementsByTag(result.elementsWithAttribute as any[])
+    : new Map();
+  
+  let html = '<div class="section"><h2>All Elements</h2>';
+  
+  // Missing elements section
+  if (result.missingAttributeCount > 0) {
+    html += '<div class="group" id="missing-section">';
+    html += '<div class="group-header" style="background: #fee2e2; color: #991b1b;">';
+    html += `❌ Missing ${escapeHtml(result.attributeName)} (${result.missingAttributeCount} ${result.missingAttributeCount === 1 ? 'element' : 'elements'})`;
+    html += '</div><div class="element-list">';
+    
+    for (const [tagName, elements] of groupedByTag.entries()) {
+      html += `<div class="group" style="margin-top: 15px;">`;
+      html += `<div class="group-header" style="font-size: 14px;">${escapeHtml(tagName)} (${elements.length})</div>`;
+      html += '<div class="element-list">';
+      
+      for (const element of elements) {
+        html += generateElementCard(element, result.attributeName, 'missing');
+      }
+      
+      html += '</div></div>';
+    }
+    
+    html += '</div></div>';
+  }
+  
+  // Elements with attribute section
+  if (result.elementsWithAttribute && result.elementsWithAttribute.length > 0) {
+    html += '<div class="group" id="has-attribute-section" style="margin-top: 30px;">';
+    html += '<div class="group-header" style="background: #d1fae5; color: #065f46;">';
+    html += `✅ Has ${escapeHtml(result.attributeName)} (${result.hasAttributeCount || 0} ${(result.hasAttributeCount || 0) === 1 ? 'element' : 'elements'})`;
+    html += '</div><div class="element-list">';
+    
+    for (const [tagName, elements] of groupedWithAttribute.entries()) {
+      html += `<div class="group" style="margin-top: 15px;">`;
+      html += `<div class="group-header" style="font-size: 14px;">${escapeHtml(tagName)} (${elements.length})</div>`;
+      html += '<div class="element-list">';
+      
+      for (const element of elements) {
+        html += generateElementCardWithAttribute(element as HasAttributeElement, result.attributeName);
+      }
+      
+      html += '</div></div>';
+    }
+    
+    html += '</div></div>';
+  }
+  
+  html += '</div>';
+  return html;
 }
 
 function generateMissingElementsSection(
@@ -398,11 +634,64 @@ function generateMissingElementsSection(
   return html;
 }
 
-function generateElementCard(element: MissingAttributeElement, attributeName: string): string {
+function generateElementCardWithAttribute(element: HasAttributeElement, attributeName: string): string {
   return `
-    <div class="element-item">
+    <div class="element-item has-attribute" data-type="has-attribute">
       <div class="element-header">
-        <span class="tag-badge">${escapeHtml(element.tagName)}</span>
+        <span class="tag-badge" style="background: #10b981;">${escapeHtml(element.tagName)}</span>
+        <span class="element-text">${escapeHtml(element.textSnippet || '(no text)')}</span>
+      </div>
+      <div class="element-details">
+        <div class="detail-item">
+          <span class="detail-label">Page URL</span>
+          <a href="${escapeHtml(element.pageUrl)}" target="_blank" class="url-link">${escapeHtml(element.pageUrl)}</a>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">Selector</span>
+          <span class="detail-value">${escapeHtml(element.selector)}</span>
+        </div>
+        ${element.xpath ? `
+        <div class="detail-item">
+          <span class="detail-label">XPath</span>
+          <span class="detail-value">${escapeHtml(element.xpath)}</span>
+        </div>
+        ` : ''}
+        ${element.role ? `
+        <div class="detail-item">
+          <span class="detail-label">Role</span>
+          <span class="detail-value">${escapeHtml(element.role)}</span>
+        </div>
+        ` : ''}
+        ${element.boundingBox ? `
+        <div class="detail-item">
+          <span class="detail-label">Position</span>
+          <span class="detail-value">x: ${element.boundingBox.x}, y: ${element.boundingBox.y}</span>
+        </div>
+        ` : ''}
+      </div>
+      <div style="margin-top: 15px;">
+        <span class="detail-label">${escapeHtml(attributeName)} value:</span>
+        <div class="attribute-value">${escapeHtml(element.attributeValue)}</div>
+      </div>
+      <div class="element-screenshot" style="margin-top: 15px;">
+        <div class="element-screenshot-label">📸 Element Screenshot</div>
+        ${element.screenshot ? `
+        <img src="data:image/png;base64,${element.screenshot}" alt="Screenshot of ${escapeHtml(element.tagName)} element: ${escapeHtml(element.textSnippet || 'no text')}" />
+        ` : `
+        <div class="screenshot-placeholder">
+          Screenshot not available. Enable <code>captureScreenshots: true</code> in audit options.
+        </div>
+        `}
+      </div>
+    </div>
+  `;
+}
+
+function generateElementCard(element: MissingAttributeElement, attributeName: string, type: 'missing' | 'has-attribute' = 'missing'): string {
+  return `
+    <div class="element-item ${type}-attribute" data-type="${type}">
+      <div class="element-header">
+        <span class="tag-badge" style="${type === 'missing' ? 'background: #ef4444;' : ''}">${escapeHtml(element.tagName)}</span>
         <span class="element-text">${escapeHtml(element.textSnippet || '(no text)')}</span>
       </div>
       <div class="element-details">
@@ -439,6 +728,16 @@ function generateElementCard(element: MissingAttributeElement, attributeName: st
         <div class="suggested-value">${escapeHtml(element.suggestedValue)}</div>
       </div>
       ` : ''}
+      <div class="element-screenshot" style="margin-top: 15px;">
+        <div class="element-screenshot-label">📸 Element Screenshot</div>
+        ${element.screenshot ? `
+        <img src="data:image/png;base64,${element.screenshot}" alt="Screenshot of ${escapeHtml(element.tagName)} element: ${escapeHtml(element.textSnippet || 'no text')}" />
+        ` : `
+        <div class="screenshot-placeholder">
+          Screenshot not available. Enable <code>captureScreenshots: true</code> in audit options.
+        </div>
+        `}
+      </div>
     </div>
   `;
 }

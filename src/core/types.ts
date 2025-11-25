@@ -57,6 +57,23 @@ export interface AuditOptions {
     total: number;
     missing: number;
   }) => void;
+
+  /**
+   * Whether to capture screenshots of missing elements (default: false)
+   * Screenshots are embedded as base64 in the HTML report
+   */
+  captureScreenshots?: boolean;
+
+  /**
+   * Whether to include elements that have the attribute in the report (default: false)
+   * When enabled, the HTML report will show both missing and present attributes
+   */
+  includeElementsWithAttribute?: boolean;
+
+  /**
+   * Disable progress indicators (default: false)
+   */
+  disableProgress?: boolean;
 }
 
 /**
@@ -107,6 +124,66 @@ export interface MissingAttributeElement {
    * Suggested test attribute value based on element context
    */
   suggestedValue?: string;
+
+  /**
+   * Base64 encoded screenshot of the element (if enabled)
+   */
+  screenshot?: string;
+}
+
+/**
+ * Information about an element that has the required test attribute
+ */
+export interface HasAttributeElement {
+  /**
+   * CSS selector for the element
+   */
+  selector: string;
+
+  /**
+   * HTML tag name (e.g., "button", "a", "div")
+   */
+  tagName: string;
+
+  /**
+   * Snippet of text content (first 100 chars)
+   */
+  textSnippet: string;
+
+  /**
+   * The actual attribute value found on the element
+   */
+  attributeValue: string;
+
+  /**
+   * XPath of the element (if available)
+   */
+  xpath?: string;
+
+  /**
+   * ARIA role attribute value (if present)
+   */
+  role?: string | null;
+
+  /**
+   * URL of the page where this element was found
+   */
+  pageUrl: string;
+
+  /**
+   * Element's bounding box position (for visual highlighting)
+   */
+  boundingBox?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+
+  /**
+   * Base64 encoded screenshot of the element (if enabled)
+   */
+  screenshot?: string;
 }
 
 /**
@@ -129,9 +206,19 @@ export interface AuditResult {
   missingAttributeCount: number;
 
   /**
+   * Number of elements that have the required attribute
+   */
+  hasAttributeCount?: number;
+
+  /**
    * Array of elements missing the required attribute
    */
   elementsMissingAttribute: MissingAttributeElement[];
+
+  /**
+   * Array of elements that have the required attribute
+   */
+  elementsWithAttribute?: HasAttributeElement[];
 
   /**
    * Timestamp when the audit was performed (ISO 8601)

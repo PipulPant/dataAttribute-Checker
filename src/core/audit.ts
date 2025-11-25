@@ -151,6 +151,8 @@ export async function auditTestAttributes(
     logToConsole = false,
     thresholds,
     onProgress,
+    captureScreenshots = false,
+    includeElementsWithAttribute = false,
   } = options;
 
   const pageUrl = page.url();
@@ -282,8 +284,9 @@ export async function auditTestAttributes(
     })
   );
 
-  // Collect missing elements and generate XPath only for them (#4 - Lazy XPath Generation)
+  // Collect missing elements and elements with attributes (#4 - Lazy XPath Generation)
   const missingElements: MissingAttributeElement[] = [];
+  const hasAttributeElements: any[] = [];
   let scannedCount = 0;
 
   for (const item of attributeChecks) {
@@ -292,7 +295,72 @@ export async function auditTestAttributes(
       onProgress({ scanned: scannedCount, total: validElements.length, missing: missingElements.length });
     }
 
-    if (!item.hasAttribute) {
+    if (item.hasAttribute && includeElementsWithAttribute) {
+      // Collect elements that have the attribute
+      let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
+      try {
+        const box = await item.element.boundingBox();
+        if (box) {
+          boundingBox = {
+            x: Math.round(box.x),
+            y: Math.round(box.y),
+            width: Math.round(box.width),
+            height: Math.round(box.height),
+          };
+        }
+      } catch {
+        // Bounding box not available
+      }
+
+      // Get attribute value
+      const attributeValue = await item.element.evaluate(
+        (el: any, attr: string) => el.getAttribute(attr),
+        attributeName
+      ).catch(() => null);
+
+      // Generate XPath
+      const xpath = await generateXPath(item.element);
+
+      // Capture screenshot if enabled
+      let screenshot: string | undefined;
+      if (captureScreenshots) {
+        try {
+          // Capture screenshot of the element
+          const screenshotBuffer = await item.element.screenshot({
+            type: 'png',
+            timeout: 10000, // Increased timeout
+          }).catch((err: any) => {
+            if (logToConsole) {
+              console.warn(colorize(`Warning: Failed to capture screenshot for element with attribute: ${err}`, 'yellow'));
+            }
+            return null;
+          });
+          
+          if (screenshotBuffer && screenshotBuffer.length > 0) {
+            screenshot = screenshotBuffer.toString('base64');
+          }
+        } catch (error) {
+          // Screenshot capture failed, continue without it
+          if (logToConsole) {
+            console.warn(colorize(`Warning: Failed to capture screenshot: ${error}`, 'yellow'));
+          }
+        }
+      }
+
+      if (attributeValue) {
+        hasAttributeElements.push({
+          selector: item.selector,
+          tagName: item.tagName,
+          textSnippet: item.textSnippet,
+          attributeValue,
+          xpath,
+          role: item.role,
+          pageUrl,
+          boundingBox,
+          screenshot,
+        });
+      }
+    } else if (!item.hasAttribute) {
       // Get bounding box
       let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
       try {
@@ -336,6 +404,32 @@ export async function auditTestAttributes(
       // Generate XPath only for missing elements (#4 - Lazy XPath Generation)
       const xpath = await generateXPath(item.element);
 
+      // Capture screenshot if enabled
+      let screenshot: string | undefined;
+      if (captureScreenshots) {
+        try {
+          // Capture screenshot of the element
+          const screenshotBuffer = await item.element.screenshot({
+            type: 'png',
+            timeout: 10000, // Increased timeout
+          }).catch((err: any) => {
+            if (logToConsole) {
+              console.warn(colorize(`Warning: Failed to capture screenshot for element: ${err}`, 'yellow'));
+            }
+            return null;
+          });
+          
+          if (screenshotBuffer && screenshotBuffer.length > 0) {
+            screenshot = screenshotBuffer.toString('base64');
+          }
+        } catch (error) {
+          // Screenshot capture failed, continue without it
+          if (logToConsole) {
+            console.warn(colorize(`Warning: Failed to capture screenshot: ${error}`, 'yellow'));
+          }
+        }
+      }
+
       missingElements.push({
         selector: item.selector,
         tagName: item.tagName,
@@ -345,6 +439,7 @@ export async function auditTestAttributes(
         pageUrl,
         boundingBox,
         suggestedValue,
+        screenshot,
       });
     }
   }
@@ -358,7 +453,9 @@ export async function auditTestAttributes(
     attributeName,
     totalElementsScanned: validElements.length,
     missingAttributeCount: missingElements.length,
+    hasAttributeCount: includeElementsWithAttribute ? hasAttributeElements.length : undefined,
     elementsMissingAttribute: missingElements,
+    elementsWithAttribute: includeElementsWithAttribute ? hasAttributeElements : undefined,
     timestamp,
     pageUrl,
   };
