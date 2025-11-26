@@ -1,5 +1,5 @@
 /**
- * Main exports for playwright-attr-audit package
+ * Main exports for playwright-testid-scanner package
  */
 
 // Core audit function and types

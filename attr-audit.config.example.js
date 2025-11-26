@@ -1,5 +1,5 @@
 /**
- * Configuration file for playwright-attr-audit
+ * Configuration file for playwright-testid-scanner
  * 
  * Copy this file to attr-audit.config.js and customize for your project.
  * The package will automatically load this file if it exists.

@@ -29,7 +29,7 @@ sleep 2
 
 echo ""
 echo "📋 Test: CLI with HTML output"
-node dist/bin/playwright-attr-audit.js --baseUrl=http://localhost:8000/test-page.html --html=cli-test-report.html --no-progress
+node dist/bin/playwright-testid-scanner.js --baseUrl=http://localhost:8000/test-page.html --html=cli-test-report.html --no-progress
 
 if [ -f "cli-test-report.html" ]; then
     echo "✅ PASS: CLI generated HTML report"
@@ -40,7 +40,7 @@ fi
 
 echo ""
 echo "📋 Test: CLI with JSON output"
-node dist/bin/playwright-attr-audit.js --baseUrl=http://localhost:8000/test-page.html --output=cli-test-report.json --no-progress
+node dist/bin/playwright-testid-scanner.js --baseUrl=http://localhost:8000/test-page.html --output=cli-test-report.json --no-progress
 
 if [ -f "cli-test-report.json" ]; then
     echo "✅ PASS: CLI generated JSON report"

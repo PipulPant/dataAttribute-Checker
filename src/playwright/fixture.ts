@@ -15,7 +15,7 @@ type AuditTest = {
  * 
  * Usage with auditTestAttributes:
  * ```typescript
- * import { test } from 'playwright-attr-audit';
+ * import { test } from 'playwright-testid-scanner';
  * 
  * test('page has test attributes', async ({ page, auditTestAttributes }) => {
  *   await page.goto('https://example.com');
@@ -26,7 +26,7 @@ type AuditTest = {
  * 
  * Usage with auditCurrentPage (auto-generates HTML report):
  * ```typescript
- * import { test } from 'playwright-attr-audit';
+ * import { test } from 'playwright-testid-scanner';
  * 
  * test('audit page', async ({ page, auditCurrentPage }) => {
  *   await page.goto('https://example.com');

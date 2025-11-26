@@ -305,7 +305,7 @@ export class PageAuditor {
  * 
  * **Usage with fixture (no page parameter needed):**
  * ```typescript
- * import { test } from 'playwright-attr-audit';
+ * import { test } from 'playwright-testid-scanner';
  * 
  * test('audit', async ({ page, auditCurrentPage }) => {
  *   await page.goto('https://example.com');
@@ -316,7 +316,7 @@ export class PageAuditor {
  * **Usage without fixture (pass page parameter):**
  * ```typescript
  * import { test } from '@playwright/test';
- * import { auditCurrentPage } from 'playwright-attr-audit';
+ * import { auditCurrentPage } from 'playwright-testid-scanner';
  * 
  * test('audit', async ({ page }) => {
  *   await page.goto('https://example.com');

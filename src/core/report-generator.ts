@@ -529,24 +529,59 @@ function generateHTMLContent(result: AuditResult, outputPath?: string): string {
         // Show/hide missing elements
         const missingElements = document.querySelectorAll('[data-type="missing"]');
         missingElements.forEach(el => {
-          (el as HTMLElement).style.display = showMissing ? '' : 'none';
+          el.style.display = showMissing ? '' : 'none';
         });
         
         // Show/hide elements with attributes
         const hasElements = document.querySelectorAll('[data-type="has-attribute"]');
         hasElements.forEach(el => {
-          (el as HTMLElement).style.display = showHasAttribute ? '' : 'none';
+          el.style.display = showHasAttribute ? '' : 'none';
         });
         
-        // Show/hide section headers
+        // Show/hide section headers and update group visibility
         const missingSection = document.getElementById('missing-section');
         const hasSection = document.getElementById('has-attribute-section');
         
+        // Helper function to check if element is visible
+        const isVisible = (el: Element): boolean => {
+          const style = window.getComputedStyle(el);
+          return style.display !== 'none' && style.visibility !== 'hidden';
+        };
+        
         if (missingSection) {
-          (missingSection as HTMLElement).style.display = showMissing ? '' : 'none';
+          // Show/hide entire missing section
+          missingSection.style.display = showMissing ? '' : 'none';
+          
+          // Update visibility of tag groups within missing section
+          const tagGroups = missingSection.querySelectorAll('.group');
+          tagGroups.forEach(group => {
+            if (!showMissing) {
+              group.style.display = 'none';
+            } else {
+              // Check if any child elements are visible
+              const childElements = group.querySelectorAll('[data-type="missing"]');
+              const hasVisibleChildren = Array.from(childElements).some(el => isVisible(el));
+              group.style.display = hasVisibleChildren ? '' : 'none';
+            }
+          });
         }
+        
         if (hasSection) {
-          (hasSection as HTMLElement).style.display = showHasAttribute ? '' : 'none';
+          // Show/hide entire has-attribute section
+          hasSection.style.display = showHasAttribute ? '' : 'none';
+          
+          // Update visibility of tag groups within has-attribute section
+          const tagGroups = hasSection.querySelectorAll('.group');
+          tagGroups.forEach(group => {
+            if (!showHasAttribute) {
+              group.style.display = 'none';
+            } else {
+              // Check if any child elements are visible
+              const childElements = group.querySelectorAll('[data-type="has-attribute"]');
+              const hasVisibleChildren = Array.from(childElements).some(el => isVisible(el));
+              group.style.display = hasVisibleChildren ? '' : 'none';
+            }
+          });
         }
       }
       

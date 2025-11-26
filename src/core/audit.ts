@@ -161,6 +161,14 @@ export async function auditTestAttributes(
     includeElementsWithAttribute = false,
   } = options;
 
+  // Performance warning for screenshots
+  if (captureScreenshots && logToConsole) {
+    console.warn(colorize(
+      '⚠️  Performance Warning: Screenshots are enabled. This will significantly slow down the audit.',
+      'yellow'
+    ));
+  }
+
   const pageUrl = page.url();
   const timestamp = new Date().toISOString();
 
@@ -307,203 +315,253 @@ export async function auditTestAttributes(
   );
 
   // Collect missing elements and elements with attributes (#4 - Lazy XPath Generation)
+  // PERFORMANCE OPTIMIZATION: Process elements in parallel batches instead of sequentially
   const missingElements: MissingAttributeElement[] = [];
   const hasAttributeElements: any[] = [];
-  let scannedCount = 0;
+  
+  // Separate elements by type for parallel processing
+  const elementsWithAttribute = attributeChecks.filter(item => item.hasAttribute && includeElementsWithAttribute);
+  const elementsMissingAttribute = attributeChecks.filter(item => !item.hasAttribute);
 
-  for (const item of attributeChecks) {
-    scannedCount++;
-    if (onProgress && scannedCount % 10 === 0) {
-      onProgress({ scanned: scannedCount, total: validElements.length, missing: missingElements.length });
-    }
+  // Process elements with attributes in parallel batches
+  if (elementsWithAttribute.length > 0) {
+    const batchSize = 50; // Process 50 elements at a time
+    for (let i = 0; i < elementsWithAttribute.length; i += batchSize) {
+      const batch = elementsWithAttribute.slice(i, i + batchSize);
+      
+      // Process batch in parallel
+      const batchResults = await Promise.all(
+        batch.map(async (item) => {
+          try {
+            // Parallelize bounding box and attribute value
+            // Note: XPath generation is skipped for elements with attributes to improve performance
+            const [box, attributeValue] = await Promise.all([
+              item.element.boundingBox().catch(() => null),
+              item.element.evaluate(
+                (el: any, attr: string) => el.getAttribute(attr),
+                attributeName
+              ).catch(() => null),
+            ]);
+            const xpath = undefined; // Skip XPath for elements with attributes for better performance
 
-    if (item.hasAttribute && includeElementsWithAttribute) {
-      // Collect elements that have the attribute
-      let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
-      try {
-        const box = await item.element.boundingBox();
-        if (box) {
-          boundingBox = {
-            x: Math.round(box.x),
-            y: Math.round(box.y),
-            width: Math.round(box.width),
-            height: Math.round(box.height),
-          };
-        }
-      } catch {
-        // Bounding box not available
-      }
+            let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
+            if (box) {
+              boundingBox = {
+                x: Math.round(box.x),
+                y: Math.round(box.y),
+                width: Math.round(box.width),
+                height: Math.round(box.height),
+              };
+            }
 
-      // Get attribute value
-      const attributeValue = await item.element.evaluate(
-        (el: any, attr: string) => el.getAttribute(attr),
-        attributeName
-      ).catch(() => null);
+            // Capture screenshot if enabled (only for elements with attributes)
+            let screenshot: string | undefined;
+            if (captureScreenshots) {
+              try {
+                const screenshotBuffer = await item.element.screenshot({
+                  type: 'png',
+                  timeout: 2000, // Reduced timeout from 10s to 2s for better performance
+                }).catch(() => null);
+                
+                if (screenshotBuffer && screenshotBuffer.length > 0) {
+                  screenshot = screenshotBuffer.toString('base64');
+                }
+              } catch {
+                // Screenshot capture failed, continue without it
+              }
+            }
 
-      // Generate XPath
-      const xpath = await generateXPath(item.element);
-
-      // Capture screenshot if enabled
-      let screenshot: string | undefined;
-      if (captureScreenshots) {
-        try {
-          // Capture screenshot of the element
-          const screenshotBuffer = await item.element.screenshot({
-            type: 'png',
-            timeout: 10000, // Increased timeout
-          }).catch((err: any) => {
-            if (logToConsole) {
-              console.warn(colorize(`Warning: Failed to capture screenshot for element with attribute: ${err}`, 'yellow'));
+            if (attributeValue) {
+              return {
+                selector: item.selector,
+                tagName: item.tagName,
+                textSnippet: item.textSnippet,
+                attributeValue,
+                xpath,
+                role: item.role,
+                pageUrl,
+                boundingBox,
+                screenshot,
+              };
             }
             return null;
-          });
-          
-          if (screenshotBuffer && screenshotBuffer.length > 0) {
-            screenshot = screenshotBuffer.toString('base64');
+          } catch {
+            return null;
           }
-        } catch (error) {
-          // Screenshot capture failed, continue without it
-          if (logToConsole) {
-            console.warn(colorize(`Warning: Failed to capture screenshot: ${error}`, 'yellow'));
-          }
-        }
-      }
+        })
+      );
 
-      if (attributeValue) {
-        hasAttributeElements.push({
-          selector: item.selector,
-          tagName: item.tagName,
-          textSnippet: item.textSnippet,
-          attributeValue,
-          xpath,
-          role: item.role,
-          pageUrl,
-          boundingBox,
-          screenshot,
+      hasAttributeElements.push(...batchResults.filter(r => r !== null));
+      
+      // Report progress
+      if (onProgress) {
+        onProgress({ 
+          scanned: Math.min(i + batchSize, elementsWithAttribute.length), 
+          total: validElements.length, 
+          missing: missingElements.length 
         });
       }
-    } else if (!item.hasAttribute) {
-      // Get bounding box
-      let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
-      try {
-        const box = await item.element.boundingBox();
-        if (box) {
-          boundingBox = {
-            x: Math.round(box.x),
-            y: Math.round(box.y),
-            width: Math.round(box.width),
-            height: Math.round(box.height),
-          };
-        }
-      } catch {
-        // Bounding box not available
-      }
+    }
+  }
 
-      // Generate suggested value in data-test-id format (kebab-case with hyphens)
-      const suggestedValue = await item.element.evaluate((el: any) => {
-        const text = (el.textContent || '').trim().toLowerCase();
-        const id = el.id;
-        const className = el.className;
-        const name = el.name;
-        const placeholder = el.placeholder;
+  // Process missing elements in parallel batches
+  if (elementsMissingAttribute.length > 0) {
+    const batchSize = 50; // Process 50 elements at a time
+    for (let i = 0; i < elementsMissingAttribute.length; i += batchSize) {
+      const batch = elementsMissingAttribute.slice(i, i + batchSize);
+      
+      // Process batch in parallel
+      const batchResults = await Promise.all(
+        batch.map(async (item) => {
+          try {
+            // Parallelize bounding box and suggested value generation
+            // XPath is generated separately to avoid blocking
+            const [box, suggestedValue] = await Promise.all([
+              item.element.boundingBox().catch(() => null),
+              item.element.evaluate((el: any) => {
+                // Helper function to convert to kebab-case
+                const toKebabCase = (str: string): string => {
+                  return str
+                    .replace(/([A-Z])/g, '-$1')
+                    .replace(/[^a-z0-9\s-]/gi, '')
+                    .replace(/\s+/g, '-')
+                    .replace(/-+/g, '-')
+                    .replace(/^-|-$/g, '')
+                    .toLowerCase();
+                };
 
-        // Priority 1: Use ID if available (convert to kebab-case)
-        if (id) {
-          return id
-            .replace(/([A-Z])/g, '-$1') // Add hyphen before capital letters
-            .replace(/[^a-z0-9-]/gi, '-') // Replace non-alphanumeric with hyphen
-            .replace(/-+/g, '-') // Replace multiple hyphens with single
-            .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-            .toLowerCase();
-        }
+                // Helper function to get visible text (excludes hidden elements and scripts)
+                const getVisibleText = (element: any): string => {
+                  const clone = element.cloneNode(true);
+                  // Remove script and style elements
+                  const scripts = clone.querySelectorAll('script, style');
+                  scripts.forEach((s: any) => s.remove());
+                  
+                  // Get text content and clean it
+                  let text = (clone.textContent || '').trim();
+                  
+                  // If text is too long or contains too many newlines, try to get first meaningful line
+                  if (text.length > 100) {
+                    const lines = text.split(/\n/).map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+                    if (lines.length > 0) {
+                      text = lines[0];
+                    }
+                  }
+                  
+                  return text;
+                };
 
-        // Priority 2: Use name attribute if available
-        if (name) {
-          return name
-            .replace(/([A-Z])/g, '-$1')
-            .replace(/[^a-z0-9-]/gi, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '')
-            .toLowerCase();
-        }
+                const id = el.id;
+                const name = el.name;
+                const placeholder = el.placeholder;
+                const className = el.className;
+                const ariaLabel = el.getAttribute('aria-label');
+                
+                // Priority 1: Use ID if available (convert to kebab-case)
+                if (id) {
+                  return toKebabCase(id);
+                }
 
-        // Priority 3: Use text content (convert to kebab-case)
-        if (text && text.length > 0 && text.length < 50) {
-          return text
-            .replace(/[^a-z0-9\s-]/gi, '') // Remove special chars
-            .replace(/\s+/g, '-') // Replace spaces with hyphens
-            .replace(/-+/g, '-') // Replace multiple hyphens with single
-            .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
-            .toLowerCase();
-        }
+                // Priority 2: Use aria-label if available
+                if (ariaLabel) {
+                  return toKebabCase(ariaLabel);
+                }
 
-        // Priority 4: Use placeholder if available
-        if (placeholder) {
-          return placeholder
-            .replace(/[^a-z0-9\s-]/gi, '')
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '')
-            .toLowerCase();
-        }
+                // Priority 3: Check parent element's aria-label (one level up)
+                let parent = el.parentElement;
+                if (parent) {
+                  const parentAriaLabel = parent.getAttribute('aria-label');
+                  if (parentAriaLabel) {
+                    return toKebabCase(parentAriaLabel);
+                  }
+                }
 
-        // Priority 5: Use className (first meaningful class)
-        if (className && typeof className === 'string') {
-          const classes = className.split(' ').filter(c => c && !c.includes('css-') && !c.startsWith('Mui'));
-          if (classes.length > 0) {
-            return classes[0]
-              .replace(/([A-Z])/g, '-$1')
-              .replace(/[^a-z0-9-]/gi, '-')
-              .replace(/-+/g, '-')
-              .replace(/^-|-$/g, '')
-              .toLowerCase();
-          }
-        }
+                // Priority 4: Use name attribute if available
+                if (name) {
+                  return toKebabCase(name);
+                }
 
-        // Fallback: Use tag name with random suffix
-        return `${el.tagName.toLowerCase()}-${Math.random().toString(36).substring(2, 8)}`;
-      });
+                // Priority 5: Use visible text content (better extraction from nested elements)
+                const visibleText = getVisibleText(el);
+                if (visibleText && visibleText.length > 0 && visibleText.length < 50) {
+                  return toKebabCase(visibleText);
+                }
 
-      // Generate XPath only for missing elements (#4 - Lazy XPath Generation)
-      const xpath = await generateXPath(item.element);
+                // Priority 6: Use placeholder if available
+                if (placeholder) {
+                  return toKebabCase(placeholder);
+                }
 
-      // Capture screenshot if enabled
-      let screenshot: string | undefined;
-      if (captureScreenshots) {
-        try {
-          // Capture screenshot of the element
-          const screenshotBuffer = await item.element.screenshot({
-            type: 'png',
-            timeout: 10000, // Increased timeout
-          }).catch((err: any) => {
-            if (logToConsole) {
-              console.warn(colorize(`Warning: Failed to capture screenshot for element: ${err}`, 'yellow'));
+                // Priority 7: Use className (first meaningful class)
+                if (className && typeof className === 'string') {
+                  const classes = className.split(' ').filter(c => c && !c.includes('css-') && !c.startsWith('Mui'));
+                  if (classes.length > 0) {
+                    return toKebabCase(classes[0]);
+                  }
+                }
+
+                // Fallback: Use tag name with random suffix
+                return `${el.tagName.toLowerCase()}-${Math.random().toString(36).substring(2, 8)}`;
+              }).catch(() => undefined),
+            ]);
+            
+            // Generate XPath separately (non-blocking, can be slow for deep DOM trees)
+            const xpath = await generateXPath(item.element).catch(() => undefined);
+
+            let boundingBox: { x: number; y: number; width: number; height: number } | undefined;
+            if (box) {
+              boundingBox = {
+                x: Math.round(box.x),
+                y: Math.round(box.y),
+                width: Math.round(box.width),
+                height: Math.round(box.height),
+              };
             }
-            return null;
-          });
-          
-          if (screenshotBuffer && screenshotBuffer.length > 0) {
-            screenshot = screenshotBuffer.toString('base64');
-          }
-        } catch (error) {
-          // Screenshot capture failed, continue without it
-          if (logToConsole) {
-            console.warn(colorize(`Warning: Failed to capture screenshot: ${error}`, 'yellow'));
-          }
-        }
-      }
 
-      missingElements.push({
-        selector: item.selector,
-        tagName: item.tagName,
-        textSnippet: item.textSnippet,
-        xpath,
-        role: item.role,
-        pageUrl,
-        boundingBox,
-        suggestedValue,
-        screenshot,
-      });
+            // Capture screenshot if enabled (only for missing elements)
+            let screenshot: string | undefined;
+            if (captureScreenshots) {
+              try {
+                const screenshotBuffer = await item.element.screenshot({
+                  type: 'png',
+                  timeout: 2000, // Reduced timeout from 10s to 2s for better performance
+                }).catch(() => null);
+                
+                if (screenshotBuffer && screenshotBuffer.length > 0) {
+                  screenshot = screenshotBuffer.toString('base64');
+                }
+              } catch {
+                // Screenshot capture failed, continue without it
+              }
+            }
+
+            return {
+              selector: item.selector,
+              tagName: item.tagName,
+              textSnippet: item.textSnippet,
+              xpath,
+              role: item.role,
+              pageUrl,
+              boundingBox,
+              suggestedValue,
+              screenshot,
+            };
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      missingElements.push(...batchResults.filter(r => r !== null));
+      
+      // Report progress
+      if (onProgress) {
+        onProgress({ 
+          scanned: validElements.length, 
+          total: validElements.length, 
+          missing: missingElements.length 
+        });
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-# playwright-attr-audit
+# playwright-testid-scanner
 
 A Playwright plugin and CLI tool to audit web pages for missing test attributes on interactive elements. Helps ensure your application has proper test identifiers for reliable end-to-end testing.
 
@@ -18,7 +18,7 @@ A Playwright plugin and CLI tool to audit web pages for missing test attributes 
 Audit pages as you navigate through your application - simply call the plugin after each page navigation:
 
 ```typescript
-import { auditCurrentPage } from 'playwright-attr-audit';
+import { auditCurrentPage } from 'playwright-testid-scanner';
 
 // Navigate to Page A
 await page.goto('https://example.com/page-a');
@@ -47,19 +47,19 @@ This package requires:
 ### Install the Package
 
 ```bash
-npm install --save-dev playwright-attr-audit
+npm install --save-dev playwright-testid-scanner
 ```
 
 Or using yarn:
 
 ```bash
-yarn add -D playwright-attr-audit
+yarn add -D playwright-testid-scanner
 ```
 
 Or using pnpm:
 
 ```bash
-pnpm add -D playwright-attr-audit
+pnpm add -D playwright-testid-scanner
 ```
 
 ### Install Playwright (if not already installed)
@@ -84,7 +84,7 @@ The simplest way to use this package - audit pages as you navigate. **Automatica
 
 **With Playwright Fixture (Recommended - No need to pass `page`):**
 ```typescript
-import { test, expect } from 'playwright-attr-audit';
+import { test, expect } from 'playwright-testid-scanner';
 
 test('audit pages during navigation', async ({ page, auditCurrentPage }) => {
   // Navigate to Page A
@@ -107,7 +107,7 @@ test('audit pages during navigation', async ({ page, auditCurrentPage }) => {
 **Without Fixture (Pass `page` parameter):**
 ```typescript
 import { test, expect } from '@playwright/test';
-import { auditCurrentPage } from 'playwright-attr-audit';
+import { auditCurrentPage } from 'playwright-testid-scanner';
 
 test('audit pages during navigation', async ({ page }) => {
   await page.goto('https://example.com/page-a');
@@ -136,7 +136,7 @@ Works with any Playwright test setup:
 **TypeScript Example:**
 ```typescript
 import { test, expect } from '@playwright/test';
-import { auditTestAttributes } from 'playwright-attr-audit';
+import { auditTestAttributes } from 'playwright-testid-scanner';
 
 test('page has test attributes on key elements', async ({ page }) => {
   await page.goto('https://example.com');
@@ -165,7 +165,7 @@ test('page has test attributes on key elements', async ({ page }) => {
 **JavaScript Example:**
 ```javascript
 const { test, expect } = require('@playwright/test');
-const { auditTestAttributes } = require('playwright-attr-audit');
+const { auditTestAttributes } = require('playwright-testid-scanner');
 
 test('page has test attributes on key elements', async ({ page }) => {
   await page.goto('https://example.com');
@@ -185,8 +185,8 @@ For a more integrated experience with TypeScript, use the provided fixture. **No
 
 **Simple approach - Auto-generates HTML report:**
 ```typescript
-// Import test from playwright-attr-audit instead of @playwright/test
-import { test, expect } from 'playwright-attr-audit';
+// Import test from playwright-testid-scanner instead of @playwright/test
+import { test, expect } from 'playwright-testid-scanner';
 
 test('audit page with auto-report', async ({ page, auditCurrentPage }) => {
   await page.goto('https://example.com');
@@ -207,7 +207,7 @@ test('audit page with auto-report', async ({ page, auditCurrentPage }) => {
 
 **Advanced approach - Get results without auto-report:**
 ```typescript
-import { test, expect } from 'playwright-attr-audit';
+import { test, expect } from 'playwright-testid-scanner';
 
 test('page has test attributes', async ({ page, auditTestAttributes }) => {
   await page.goto('https://example.com');
@@ -226,7 +226,7 @@ test('page has test attributes', async ({ page, auditTestAttributes }) => {
 
 ```typescript
 import { test, expect } from '@playwright/test';
-import { auditTestAttributes, generateHTMLReport } from 'playwright-attr-audit';
+import { auditTestAttributes, generateHTMLReport } from 'playwright-testid-scanner';
 import * as path from 'path';
 
 test('audit and generate report', async ({ page }) => {
@@ -252,7 +252,7 @@ Audit pages as you navigate through your application:
 **Simple approach - Audit each page individually:**
 ```typescript
 import { test, expect } from '@playwright/test';
-import { auditCurrentPage } from 'playwright-attr-audit';
+import { auditCurrentPage } from 'playwright-testid-scanner';
 
 test('audit multiple pages during navigation', async ({ page }) => {
   // Navigate to Page A
@@ -283,7 +283,7 @@ test('audit multiple pages during navigation', async ({ page }) => {
 **Advanced approach - Track multiple pages with PageAuditor:**
 ```typescript
 import { test, expect } from '@playwright/test';
-import { PageAuditor } from 'playwright-attr-audit';
+import { PageAuditor } from 'playwright-testid-scanner';
 
 test('audit workflow across multiple pages', async ({ page }) => {
   const auditor = new PageAuditor();
@@ -323,7 +323,7 @@ If you're using Playwright without the test framework:
 
 ```typescript
 import { chromium } from 'playwright';
-import { auditTestAttributes, generateHTMLReport } from 'playwright-attr-audit';
+import { auditTestAttributes, generateHTMLReport } from 'playwright-testid-scanner';
 
 async function runAudit() {
   const browser = await chromium.launch();
@@ -390,7 +390,7 @@ module.exports = {
 ```typescript
 // pages/HomePage.ts
 import { Page } from '@playwright/test';
-import { auditTestAttributes } from 'playwright-attr-audit';
+import { auditTestAttributes } from 'playwright-testid-scanner';
 
 export class HomePage {
   constructor(private page: Page) {}
@@ -424,7 +424,7 @@ test('home page has test attributes', async ({ page }) => {
 ```typescript
 // helpers/audit-helper.ts
 import { Page } from '@playwright/test';
-import { auditTestAttributes, AuditResult } from 'playwright-attr-audit';
+import { auditTestAttributes, AuditResult } from 'playwright-testid-scanner';
 
 export async function assertTestAttributes(
   page: Page,
@@ -459,7 +459,7 @@ test('page audit', async ({ page }) => {
 Run audits directly from the command line:
 
 ```bash
-npx playwright-attr-audit \
+npx playwright-testid-scanner \
   --baseUrl=https://my-app.example.com \
   --attr=data-testID \
   --include="button,a,[role=button]" \
@@ -606,7 +606,7 @@ module.exports = {
 Or with TypeScript (`attr-audit.config.ts`):
 
 ```typescript
-import { AuditConfig } from 'playwright-attr-audit';
+import { AuditConfig } from 'playwright-testid-scanner';
 
 const config: AuditConfig = {
   attributeName: 'data-testid',
@@ -698,7 +698,7 @@ Generates a visual HTML report from audit results.
 #### Example
 
 ```typescript
-import { auditTestAttributes, generateHTMLReport } from 'playwright-attr-audit';
+import { auditTestAttributes, generateHTMLReport } from 'playwright-testid-scanner';
 
 const result = await auditTestAttributes(page);
 generateHTMLReport(result, 'audit-report.html');
@@ -722,7 +722,7 @@ Convenience function to audit the current page state and **automatically generat
 
 **With Playwright Fixture (Recommended - No `page` parameter needed):**
 ```typescript
-import { test } from 'playwright-attr-audit';
+import { test } from 'playwright-testid-scanner';
 
 test('audit pages', async ({ page, auditCurrentPage }) => {
   await page.goto('https://example.com');
@@ -741,7 +741,7 @@ test('audit pages', async ({ page, auditCurrentPage }) => {
 **Without Fixture (Pass `page` parameter):**
 ```typescript
 import { test } from '@playwright/test';
-import { auditCurrentPage } from 'playwright-attr-audit';
+import { auditCurrentPage } from 'playwright-testid-scanner';
 
 test('audit pages', async ({ page }) => {
   await page.goto('https://example.com');
@@ -776,7 +776,7 @@ Helper class for tracking and auditing multiple pages during navigation.
 #### Example
 
 ```typescript
-import { PageAuditor } from 'playwright-attr-audit';
+import { PageAuditor } from 'playwright-testid-scanner';
 
 const auditor = new PageAuditor();
 
@@ -872,7 +872,7 @@ Each missing element in the HTML report includes:
 You can also generate HTML reports programmatically:
 
 ```typescript
-import { auditTestAttributes, generateHTMLReport } from 'playwright-attr-audit';
+import { auditTestAttributes, generateHTMLReport } from 'playwright-testid-scanner';
 
 test('generate report', async ({ page }) => {
   await page.goto('https://example.com');
@@ -892,7 +892,7 @@ test('generate report', async ({ page }) => {
 
 1. **Install the package:**
    ```bash
-   npm install --save-dev playwright-attr-audit
+   npm install --save-dev playwright-testid-scanner
    ```
 
 2. **Ensure Playwright is installed:**
@@ -906,7 +906,7 @@ test('generate report', async ({ page }) => {
    Create a file `tests/audit.spec.ts` (or `.js`):
    ```typescript
    import { test, expect } from '@playwright/test';
-   import { auditTestAttributes } from 'playwright-attr-audit';
+   import { auditTestAttributes } from 'playwright-testid-scanner';
 
    test('check test attributes', async ({ page }) => {
      await page.goto('https://example.com');
@@ -1001,7 +1001,7 @@ If you get TypeScript errors, ensure your `tsconfig.json` includes:
 
 If you get "Cannot find module" errors:
 
-1. Ensure the package is installed: `npm list playwright-attr-audit`
+1. Ensure the package is installed: `npm list playwright-testid-scanner`
 2. Clear node_modules and reinstall: `rm -rf node_modules && npm install`
 3. Check your import path matches your module system (ESM vs CommonJS)
 

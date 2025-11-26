@@ -9,12 +9,17 @@ import { ProgressBar, Spinner } from './progress';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// Read version from package.json
+const packageJsonPath = path.join(__dirname, '../../package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+const version = packageJson.version || '1.0.3';
+
 const program = new Command();
 
 program
-  .name('playwright-attr-audit')
+  .name('playwright-testid-scanner')
   .description('Audit web pages for missing test attributes on interactive elements')
-  .version('1.0.0')
+  .version(version)
   .requiredOption('--baseUrl <url>', 'URL to audit')
   .option('--attr <name>', 'Attribute name to check', 'data-testID')
   .option('--include <selectors>', 'Comma-separated selectors to scan')
@@ -29,10 +34,10 @@ program
   .option('--no-progress', 'Disable progress indicators')
   .addHelpText('after', `
 Examples:
-  $ playwright-attr-audit --baseUrl=https://example.com
-  $ playwright-attr-audit --baseUrl=https://example.com --attr=data-testid --html=report.html
-  $ playwright-attr-audit --baseUrl=https://example.com --include="button,a" --warning-threshold=10
-  $ playwright-attr-audit --baseUrl=https://example.com --failure-threshold=50 --no-headless
+  $ playwright-testid-scanner --baseUrl=https://example.com
+  $ playwright-testid-scanner --baseUrl=https://example.com --attr=data-testid --html=report.html
+  $ playwright-testid-scanner --baseUrl=https://example.com --include="button,a" --warning-threshold=10
+  $ playwright-testid-scanner --baseUrl=https://example.com --failure-threshold=50 --no-headless
   `);
 
 /**
